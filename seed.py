@@ -1,0 +1,61 @@
+# backend/seed.py
+import asyncio
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+# 🔒 L'ALIGNEUR DE MÉMOIRE : On importe tous les modèles ensemble pour éviter le crash de relation SQL
+from app.models.user import User
+from app.models.product import Product, ProductVariant
+from app.models.order import Order, OrderItem
+
+from app.core.db import engine
+
+async def seed_luxury_catalog():
+    print("🚀 Connexion au cluster PostgreSQL Supabase Canada...")
+    
+    async with AsyncSession(engine) as session:
+        # Vérification si la base contient déjà les produits
+        result = await session.exec(select(Product))
+        existing_products = result.all()
+        
+        if len(existing_products) > 0:
+            print("💡 Le catalogue Cloud contient déjà vos articles. Fin du seeding.")
+            return
+
+        print("📦 Injection des confections artisanales de maroquinerie...")
+
+        # Article 1 : Sac de Prestige
+        bag = Product(
+            name="Le Sac Cabas Horizon - Cuir Grainé Noir",
+            description="Sac cabas intemporel confectionné à la main. Doublure en suède rouge signature, finitions métalliques en laiton poli.",
+            price_cad=1250.00,
+            image_url="https://unsplash.com",
+            category="Sacs",
+            is_active=True
+        )
+        session.add(bag)
+        await session.flush()
+
+        session.add(ProductVariant(product_id=bag.id, size=None, color="Noir Ébène", stock=15))
+        session.add(ProductVariant(product_id=bag.id, size=None, color="Bordeaux Royal", stock=8))
+
+        # Article 2 : Mocassins d'Atelier
+        shoes = Product(
+            name="Le Mocassin Oxford - Daim Marron Tabac",
+            description="Mocassins de conduite traditionnels montés sur une semelle à picots en gomme naturelle.",
+            price_cad=480.00,
+            image_url="https://unsplash.com",
+            category="Chaussures",
+            is_active=True
+        )
+        session.add(shoes)
+        await session.flush()
+
+        session.add(ProductVariant(product_id=shoes.id, size=8, color="Marron Tabac", stock=20))
+        session.add(ProductVariant(product_id=shoes.id, size=9, color="Marron Tabac", stock=25))
+
+        await session.commit()
+        print("🎉 Catalogue de l'Atelier synchronisé avec succès sur Supabase !")
+
+if __name__ == "__main__":
+    asyncio.run(seed_luxury_catalog())
