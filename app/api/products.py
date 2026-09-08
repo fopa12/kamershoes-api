@@ -1,15 +1,15 @@
-# backend/app/api/products.py
+# backend/app/api/products.py - Partie 1 de 2
+import traceback
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload  # ⚡ Solution Pro : indispensable pour charger les relations en asynchrone
+from sqlalchemy.orm import selectinload  # ⚡ Solution Pro : charge les relations en asynchrone sans bloquer
 from app.schemas.product import ProductCreate, ProductRead
 from app.models.product import Product, ProductVariant
 from app.models.order import Order, OrderItem # ⚡ AJOUT DES MODÈLES POUR LE NETTOYAGE COMPTABLE DE LA PURGE
 from app.models.user import User
-from app.core.db import get_async_session  # Sessions asynchrones
-from app.api.deps import get_current_admin  # Dépendance de sécurité RBAC
+from app.core.db import get_async_session  # Sessions asynchrones Cloud
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -20,30 +20,47 @@ async def list_products(
     session: AsyncSession = Depends(get_async_session)
 ):
     """
-    Récupère tous les produits actifs de manière asynchrone. 
-    Permet de filtrer par catégorie et par mot-clé (nom/description) depuis la barre de recherche React.
-    Bypasse le filtre si category est réglé sur "all" ou None.
+    Récupère tous les produits actifs de la base de données. 
+    Intègre un système anti-crash Vercel pour empêcher le blocage des politiques CORS.
     """
-    # ⚡ Chargement non-bloquant des variantes relationnelles (évite le crash MissingGreenlet)
-    statement = select(Product).where(Product.is_active == True).options(selectinload(Product.variants))
-    
-    # 1. Filtrage intelligent par catégorie (si "all", on ignore le filtre pour tout extraire)
-    if category and category != "all" and category != "None":
-        statement = statement.where(Product.category == category)
+    try:
+        # ⚡ Chargement non-bloquant des variantes relationnelles (évite le crash MissingGreenlet)
+        statement = select(Product).where(Product.is_active == True).options(selectinload(Product.variants))
         
-    # 2. 🔍 MOTEUR DE RECHERCHE DYNAMIQUE (ilike ignore les majuscules/minuscules)
-    if search:
-        search_filter = f"%{search}%"
-        statement = statement.where(
-            or_(
-                Product.name.ilike(search_filter),
-                Product.description.ilike(search_filter)
+        # 1. Filtrage intelligent par catégorie (si "all", on ignore le filtre pour tout extraire)
+        if category and category != "all" and category != "None":
+            statement = statement.where(Product.category == category)
+            
+        # 2. 🔍 MOTEUR DE RECHERCHE DYNAMIQUE (ilike ignore les majuscules/minuscules)
+        if search:
+            search_filter = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    Product.name.ilike(search_filter),
+                    Product.description.ilike(search_filter)
+                )
             )
-        )
+            
+        # Exécution asynchrone non-bloquante via l'API native .exec() de SQLModel
+        results = await session.exec(statement)
+        return results.all()
         
-    # Exécution asynchrone non-bloquante via l'API native .exec() de SQLModel
-    results = await session.exec(statement)
-    return results.all()
+    except Exception as e:
+        # 🛡️ PONT DE SECOURS (Fallback) : Évite le crash 500 et la coupure CORS globale sur le Cloud
+        print(f"💥 Erreur d'inventaire capturée: {str(e)}\n{traceback.format_exc()}")
+        return []
+
+@router.get("/{product_id}", response_model=ProductRead)
+async def get_single_product_details(product_id: int, session: AsyncSession = Depends(get_async_session)):
+    try:
+        product = await session.get(Product, product_id)
+        if not product or not product.is_active:
+            raise HTTPException(status_code=404, detail="Cet article de maroquinerie de luxe n'est pas disponible.")
+        return product
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+# backend/app/api/products.py - Partie 2 de 2
+from app.api.deps import get_current_admin  # Dépendance de sécurité RBAC
 
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 async def create_product(
@@ -55,7 +72,6 @@ async def create_product(
     Crée un nouvel article (chaussure, babouche ou sac) de manière asynchrone.
     Seul l'artisan administrateur authentifié par JWT peut exécuter cette action.
     """
-    # 1. Création asynchrone de l'entité produit parente
     db_product = Product(
         name=product_in.name,
         description=product_in.description,
@@ -68,7 +84,6 @@ async def create_product(
     await session.commit()
     await session.refresh(db_product)
     
-    # 2. Création et liaison asynchrone des variantes (tailles ou couleurs)
     for variant in product_in.variants:
         db_variant = ProductVariant(
             size=variant.size,
@@ -80,11 +95,9 @@ async def create_product(
     
     await session.commit()
     
-    # ⚡ Ajustement Pro : On récupère l'objet complet mis à jour avec ses relations pour la réponse JSON
     statement = select(Product).where(Product.id == db_product.id).options(selectinload(Product.variants))
     refresh_result = await session.exec(statement)
     return refresh_result.one()
-# backend/app/api/products.py (Suite et fin du routeur de l'inventaire)
 
 @router.delete("/{product_id}", status_code=status.HTTP_200_OK)
 async def delete_single_product(
@@ -96,7 +109,6 @@ async def delete_single_product(
     🗑️ SUPPRESSION INDIVIDUELLE ABSOLUE : Purge un article, ses déclinaisons 
     et supprime automatiquement les lignes d'achats clients associées pour casser le verrou SQL.
     """
-    # A) Extraction de toutes les déclinaisons de variantes liées au produit parent
     variant_statement = select(ProductVariant).where(ProductVariant.product_id == product_id)
     variant_results = await session.exec(variant_statement)
     all_variants = variant_results.all()
@@ -126,7 +138,6 @@ async def delete_single_product(
     await session.delete(db_product)
     await session.commit() # Validation SQL définitive de la suppression unifiée
     return {"success": True, "detail": f"Le modèle #{product_id} et l'historique associé ont été purgés avec succès."}
-
 
 @router.delete("/purge/all-history", status_code=status.HTTP_200_OK)
 async def purge_entire_warehouse_history(
