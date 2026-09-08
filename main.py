@@ -2,13 +2,13 @@
 import os
 import sys
 
-# 🗺️ AJUSTEMENT WINDOWS/CLOUD : Aligne les chemins de fichiers pour Vercel
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# 🌐 FORCE LE CHEMIN DE RECHERCHE ABSOLU DE VOTRE DOSSIER D'APPLICATION
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importations directes de vos modules fonctionnels d'origine
+# Importation directe des routeurs de votre Atelier stable
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
 from app.api.payments import router as payments_router
@@ -16,12 +16,12 @@ from app.api.auth import router as auth_router
 from app.api.uploads import router as uploads_router
 
 app = FastAPI(
-    title="kamershoes-Canada E-commerce API",
+    title="Atelier Cameroun-Canada E-commerce API",
     description="Back-end Serverless pour maroquinerie de luxe",
     version="2.0.0"
 )
 
-# 🔐 BOUCLIER CORS TOTALEMENT OUVERT
+# 🔐 MIDDLEWARE CORS ADAPTÉ POUR COMMUNIQUER AVEC REACT
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,7 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Raccordement de vos modules de vente
+# Raccordement des briques de vente de l'Atelier
 app.include_router(auth_router)
 app.include_router(products_router)
 app.include_router(orders_router)
