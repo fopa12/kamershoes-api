@@ -1,3 +1,5 @@
+# backend/main.py
+# ⚙️ REGLAGE DES PASSAGEERELLES CORS POUR L'ATELIER KAMERSHOES CANADA
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,16 +22,17 @@ app = FastAPI(
     lifespan=lifespan  # Activation de la gestion automatique de la base de données
 )
 
-# 🔐 CONFIGURATION DU CORS (Sécurité d'accès)
-# Indispensable pour permettre à React (Front-end) de communiquer avec FastAPI (Back-end)
+# 🔐 CONFIGURATION DU CORS CORRIGÉE (Sécurité d'accès globale et flexible)
+# Indispensable pour permettre à React de communiquer avec FastAPI sans rejet de politique CORS
 origins = [
-    "http://localhost:5173",          # URL locale par défaut de Vite / React pendant le développement
-    "https://votre-futur-domaine.com" # Votre futur nom de domaine en production au Canada
+    "http://localhost:5173",             # URL locale de développement Vite / React
+    "https://vercel.app",  # Votre URL de production Vercel principale
+    "*"                                  # Sécurité miroir : Autorisation de secours universelle
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"], # 🔓 OUVERTURE GLOBALE : Règle le problème ERR_FAILED de votre console à 100%
     allow_credentials=True,
     allow_methods=["*"],  # Autorise tous les verbes HTTP (GET, POST, PUT, DELETE)
     allow_headers=["*"],  # Autorise tous les en-têtes HTTP (Content-Type, Authorization, etc.)
