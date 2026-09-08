@@ -1,16 +1,8 @@
 # backend/main.py
-import os
-import sys
-
-# Aligne le système de fichiers pour que Vercel trouve le dossier "app"
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importation directe des routeurs stables de l'Atelier
+# Importation directe des modules locaux de l'Atelier
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
 from app.api.payments import router as payments_router
@@ -23,7 +15,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 MIDDLEWARE CORS TOTALEMENT OUVERT POUR BRISER LA BARRIÈRE DU NAVIGATEUR
+# 🔐 MIDDLEWARE CORS AUTORISANT VOTRE FRON-TEND REACT
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Raccordement propre des routeurs de l'Atelier
+# Raccordement des routeurs stables de l'Atelier
 app.include_router(auth_router)
 app.include_router(products_router)
 app.include_router(orders_router)
