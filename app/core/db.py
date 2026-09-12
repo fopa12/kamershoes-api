@@ -5,18 +5,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 LECTURE ET INJECTION SÉCURISÉE EN CAS DE VARIABLE VIDE
-DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+# 🌐 FORCE LE LIEN EN DUR : Supprime définitivement le risque de chaîne vide de la ligne 20
+DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ8%2F7D6SWtNFzZ@://supabase.com"
 
-# Si Vercel ou Windows ne trouve pas la variable, on force le lien Supabase Canada en dur
-if not DATABASE_URL:
-    DATABASE_URL = "postgresql://postgres.xpyuefuuxcquqzstityl:wVJ8%2F7D6SWtNFzZ@://supabase.com"
-
-# 🚀 Conversion automatique et obligatoire pour le pilote asynchrone exigé par le Cloud
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-
-# Création du moteur de base de données sans option de pool bloquante pour Vercel
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
