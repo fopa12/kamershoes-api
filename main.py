@@ -1,13 +1,11 @@
 # backend/main.py
 import os
 
-# 🌐 INJECTION EN AMONT : Remplace instantanément la variable pour empêcher le crash de config.py
-os.environ["DATABASE_URL"] = "postgresql://postgres.xpyuefuuxcquqzstityl:wVJ8%2F7D6SWtNFzZ@://supabase.com"
+# Surcharge de sécurité absolue au démarrage pour masquer les résidus systémiques de Vercel
+os.environ["DATABASE_URL"] = "postgresql://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-# Importation directe des modules métiers fonctionnels
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
