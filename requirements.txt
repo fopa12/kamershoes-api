@@ -12,3 +12,4 @@ fpdf==1.7.2
 PyJWT==2.10.1
 passlib==1.7.4
 bcrypt==4.2.0
+greenlet==3.1.1
