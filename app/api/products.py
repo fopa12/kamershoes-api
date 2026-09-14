@@ -4,10 +4,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload  # ⚡ Solution Pro : charge les relations en asynchrone sans bloquer
+from sqlalchemy.orm import selectinload  # ⚡ Charge les relations en asynchrone sans bloquer la mémoire
 from app.schemas.product import ProductCreate, ProductRead
 from app.models.product import Product, ProductVariant
-from app.models.order import Order, OrderItem # ⚡ AJOUT DES MODÈLES POUR LE NETTOYAGE COMPTABLE DE LA PURGE
+from app.models.order import Order, OrderItem
 from app.models.user import User
 from app.core.db import get_async_session  # Sessions asynchrones Cloud
 
@@ -21,7 +21,7 @@ async def list_products(
 ):
     """
     Récupère tous les produits actifs de la base de données. 
-    Intègre un système anti-crash Vercel pour empêcher le blocage des politiques CORS.
+    Ajusté avec .scalars().all() pour immuniser l'architecture contre l'erreur 500 de Vercel.
     """
     try:
         # ⚡ Chargement non-bloquant des variantes relationnelles (évite le crash MissingGreenlet)
@@ -41,12 +41,12 @@ async def list_products(
                 )
             )
             
-        # Exécution asynchrone non-bloquante via l'API native .exec() de SQLModel
-        results = await session.exec(statement)
-        return results.all()
+        # ⚡ EXECUTION ASYNCHRONE CLOUD SÉCURISÉE : scalars() extrait proprement les entités
+        results = await session.execute(statement)
+        return results.scalars().all()
         
     except Exception as e:
-        # 🛡️ PONT DE SECOURS (Fallback) : Évite le crash 500 et la coupure CORS globale sur le Cloud
+        # 🛡️ PONT DE SECOURS (Fallback) : Évite le crash 500 et maintient le pont CORS ouvert
         print(f"💥 Erreur d'inventaire capturée: {str(e)}\n{traceback.format_exc()}")
         return []
 
@@ -96,8 +96,8 @@ async def create_product(
     await session.commit()
     
     statement = select(Product).where(Product.id == db_product.id).options(selectinload(Product.variants))
-    refresh_result = await session.exec(statement)
-    return refresh_result.one()
+    refresh_result = await session.execute(statement)
+    return refresh_result.scalars().one()
 
 @router.delete("/{product_id}", status_code=status.HTTP_200_OK)
 async def delete_single_product(
@@ -110,14 +110,14 @@ async def delete_single_product(
     et supprime automatiquement les lignes d'achats clients associées pour casser le verrou SQL.
     """
     variant_statement = select(ProductVariant).where(ProductVariant.product_id == product_id)
-    variant_results = await session.exec(variant_statement)
-    all_variants = variant_results.all()
+    variant_results = await session.execute(variant_statement)
+    all_variants = variant_results.scalars().all()
     
     # B) Liquidation préalable ciblée des reçus d'achats enfants (order_items) pour détruire la contrainte de clé étrangère
     for var in all_variants:
         order_item_statement = select(OrderItem).where(OrderItem.variant_id == var.id)
-        order_item_results = await session.exec(order_item_statement)
-        linked_items = order_item_results.all()
+        order_item_results = await session.execute(order_item_statement)
+        linked_items = order_item_results.scalars().all()
         
         for item in linked_items:
             await session.delete(item)
@@ -129,8 +129,8 @@ async def delete_single_product(
 
     # C) Destruction définitive du produit parent de la vitrine
     product_statement = select(Product).where(Product.id == product_id)
-    product_result = await session.exec(product_statement)
-    db_product = product_result.one_or_none()
+    product_result = await session.execute(product_statement)
+    db_product = product_result.scalars().one_or_none()
     
     if not db_product:
         raise HTTPException(status_code=404, detail="Cette confection n'existe pas ou a déjà été supprimée.")
@@ -149,26 +149,26 @@ async def purge_entire_warehouse_history(
     Purger séquentiellement dans l'ordre strict des clés étrangères pour empêcher tout plantage.
     """
     # Étape 1 : Nettoyer l'historique des lignes enfants de factures (order_items)
-    all_order_items = await session.exec(select(OrderItem))
-    for item in all_order_items.all():
+    all_order_items = await session.execute(select(OrderItem))
+    for item in all_order_items.scalars().all():
         await session.delete(item)
     await session.flush()
 
     # Étape 2 : Nettoyer l'historique des commandes parentes (orders)
-    all_orders = await session.exec(select(Order))
-    for ord_row in all_orders.all():
+    all_orders = await session.execute(select(Order))
+    for ord_row in all_orders.scalars().all():
         await session.delete(ord_row)
     await session.flush()
 
     # Étape 3 : Nettoyer toutes les déclinaisons de variantes de souliers (product_variants)
     all_variants = await session.exec(select(ProductVariant))
-    for var in all_variants.all():
+    for var in all_variants.scalars().all():
         await session.delete(var)
     await session.flush()
 
     # Étape 4 : Nettoyer l'ensemble des collections de produits (products)
-    all_products = await session.exec(select(Product))
-    for prod in all_products.all():
+    all_products = await session.execute(select(Product))
+    for prod in all_products.scalars().all():
         await session.delete(prod)
         
     await session.commit() # Validation unifiée de la purge en cascade absolue
