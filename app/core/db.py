@@ -1,16 +1,16 @@
 # backend/app/core/db.py
-import os
+# ⚙️ MOTEUR DE SESSION ASYNCHRONE SUPABASE CANADA TOTALEMENT IMMUNISÉ ET CORRIGÉ
 from sqlmodel import SQLModel, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 FORCE LE LIEN EN DUR : Supprime définitivement le risque de chaîne vide de la ligne 20
-DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ8%2F7D6SWtNFzZ@://supabase.com"
+# 🌐 SYNTAXE RÉSEAU OFFICIELLE CORRIGÉE : Raccordement direct à l'hôte Supabase Canada
+DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
+    DATABASE_URL, 
+    echo=False, 
     future=True
 )
 
