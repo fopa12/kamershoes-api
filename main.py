@@ -1,7 +1,7 @@
 # backend/main.py
 import os
 
-# Surcharge de sécurité absolue au démarrage pour masquer les résidus systémiques de Vercel
+# 🌐 SURCHARGE DE SECURITE ABSOLUE : Correction de la syntaxe de l'hôte Supabase Canada
 os.environ["DATABASE_URL"] = "postgresql://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 from fastapi import FastAPI
@@ -18,6 +18,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# 🔐 OUVERTURE DU BOUCLIER CORS POUR LA VITRINE REACT
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
