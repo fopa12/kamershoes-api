@@ -1,16 +1,15 @@
 # backend/app/core/db.py
-# ⚙️ MOTEUR DE SESSION ASYNCHRONE SUPABASE CANADA - PROTECTION FINALE
 from sqlmodel import SQLModel, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 ADRESSE STRICTE ET SÉCURISÉE SANS CARACTÈRE SPÉCIAL NI CONFLIT DE VARIABLE D'ENVIRONNEMENT
+# 🌐 URL DE CONNEXION DIRECTE INJECTÉE EN DUR - RÉSOUT LE FORMATTAGE DE PORT VIDE
 DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 engine = create_async_engine(
-    DATABASE_URL, 
-    echo=False, 
+    DATABASE_URL,
+    echo=False,
     future=True
 )
 

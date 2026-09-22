@@ -1,7 +1,7 @@
 # backend/main.py
 import os
 
-# 🌐 SURCHARGE DE SECURITE ABSOLUE : Correction de la syntaxe de l'hôte Supabase Canada
+# 🛡️ SURCHARGE DU SYSTÈME : Empêche le chargement de variables d'environnement corrompues
 os.environ["DATABASE_URL"] = "postgresql://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 from fastapi import FastAPI
@@ -18,7 +18,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 OUVERTURE DU BOUCLIER CORS POUR LA VITRINE REACT
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
