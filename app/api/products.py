@@ -1,4 +1,4 @@
-# backend/app/api/products.py - Partie 1 de 2
+# backend/app/api/products.py
 import traceback
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,6 +10,7 @@ from app.models.product import Product, ProductVariant
 from app.models.order import Order, OrderItem
 from app.models.user import User
 from app.core.db import get_async_session  # Sessions asynchrones Cloud
+from app.api.deps import get_current_admin  # Dépendance de sécurité RBAC
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -21,7 +22,7 @@ async def list_products(
 ):
     """
     Récupère tous les produits actifs de la base de données. 
-    Ajusté avec .scalars().all() pour immuniser l'architecture contre l'erreur 500 de Vercel.
+    Intègre un système anti-crash Vercel pour empêcher le blocage des politiques CORS.
     """
     try:
         # ⚡ Chargement non-bloquant des variantes relationnelles (évite le crash MissingGreenlet)
@@ -59,8 +60,6 @@ async def get_single_product_details(product_id: int, session: AsyncSession = De
         return product
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-# backend/app/api/products.py - Partie 2 de 2
-from app.api.deps import get_current_admin  # Dépendance de sécurité RBAC
 
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 async def create_product(
@@ -161,7 +160,7 @@ async def purge_entire_warehouse_history(
     await session.flush()
 
     # Étape 3 : Nettoyer toutes les déclinaisons de variantes de souliers (product_variants)
-    all_variants = await session.exec(select(ProductVariant))
+    all_variants = await session.execute(select(ProductVariant))
     for var in all_variants.scalars().all():
         await session.delete(var)
     await session.flush()

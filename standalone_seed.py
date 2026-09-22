@@ -1,11 +1,16 @@
-# backend/seed.py
-# ⚙️ 100% SELF-CONTAINED SEEDING SCRIPT IMMUNE TO ENVIRONMENT BLOCKS
-import datetime
+# backend/standalone_seed.py
+# ⚙️ FULLY DECOUPLED INDEPENDENT PRODUCTION POPULATION ENGINE FOR ATELIER LUXURY
+import os
+import sys
+
+# 🛡️ GHOST SHIELD: Wipe out any broken Windows environment variables before they cause a crash
+if "DATABASE_URL" in os.environ:
+    del os.environ["DATABASE_URL"]
+os.environ.pop("DATABASE_URL", None)
+
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# 🌐 SECURE TARGET CONNECTION STRUNG HARDCODED TO BYPASS VALUEERROR
-# Placed directly inside the engine initialization function below to block variable overwrites
 Base = declarative_base()
 
 class Product(Base):
@@ -26,10 +31,10 @@ class ProductVariant(Base):
     stock = Column(Integer, default=0)
     product_id = Column(Integer, ForeignKey("product.id", ondelete="CASCADE"))
 
-def run_isolated_seed():
-    print("🚀 Connecting directly to Supabase Canada via raw string mapping layer...")
+def fire_isolated_population():
+    print("🚀 Initializing direct connection to Supabase Canada cluster...")
     
-    # 🔓 HARDCODED INSIDE METHOD: Guarantees SQLAlchemy never encounters an empty environment string
+    # 🔐 ABSOLUTE INJECTION: Raw string literal prevents variable interception crashes
     engine = create_engine(
         "postgresql://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com", 
         echo=False
@@ -40,14 +45,14 @@ def run_isolated_seed():
     
     session = SessionLocal()
     try:
-        has_data = session.query(Product).first()
-        if has_data:
-            print("💡 The Cloud database already contains your catalog. Seeding complete.")
+        has_items = session.query(Product).first()
+        if has_items:
+            print("💡 Remote Supabase tables already populate asset rows. Seeding complete.")
             return
 
-        print("📦 Seeding luxury workshop collections...")
+        print("📦 Populating premium workshop catalog grids...")
         
-        # A) Loafers Collection
+        # A) Loafers
         moccasin = Product(
             name="Mocassin L'Artisan Croco",
             description="Mocassin en cuir véritable motif crocodile, cousu main. Élégance et confort absolu.",
@@ -59,11 +64,12 @@ def run_isolated_seed():
         session.add(moccasin)
         session.flush()
         
-        v1 = ProductVariant(size="42", color="Noir", stock=15, product_id=moccasin.id)
-        v2 = ProductVariant(size="43", color="Brun", stock=10, product_id=moccasin.id)
-        session.add_all([v1, v2])
+        session.add_all([
+            ProductVariant(size="42", color="Noir", stock=15, product_id=moccasin.id),
+            ProductVariant(size="43", color="Brun", stock=10, product_id=moccasin.id)
+        ])
 
-        # B) Traditional Babouches
+        # B) Babouches
         babouche = Product(
             name="Babouche Royale",
             description="Babouche traditionnelle en cuir souple avec broderies artisanales haut de gamme.",
@@ -75,11 +81,12 @@ def run_isolated_seed():
         session.add(babouche)
         session.flush()
         
-        v3 = ProductVariant(size="41", color="Or", stock=8, product_id=babouche.id)
-        v4 = ProductVariant(size="42", color="Noir", stock=12, product_id=babouche.id)
-        session.add_all([v3, v4])
+        session.add_all([
+            ProductVariant(size="41", color="Or", stock=8, product_id=babouche.id),
+            ProductVariant(size="42", color="Noir", stock=12, product_id=babouche.id)
+        ])
 
-        # C) Premium Leather Bags
+        # C) Luxury Bags
         bag = Product(
             name="Le Grand Sac Atelier",
             description="Sac à main d'exception en cuir pleine fleur, finitions métalliques dorées.",
@@ -90,18 +97,16 @@ def run_isolated_seed():
         )
         session.add(bag)
         session.flush()
-        
-        v5 = ProductVariant(size="Unique", color="Bordeaux", stock=5, product_id=bag.id)
-        session.add(v5)
+        session.add(ProductVariant(size="Unique", color="Bordeaux", stock=5, product_id=bag.id))
 
         session.commit()
-        print("🎉 Success! The Atelier catalog has been synchronized 100% to Supabase Canada!")
+        print("🎉 Success! The isolated population script completed 100% to Supabase Canada!")
 
     except Exception as e:
         session.rollback()
-        print(f"❌ Error during seeding operation: {str(e)}")
+        print(f"❌ Core processing error: {str(e)}")
     finally:
         session.close()
 
 if __name__ == "__main__":
-    run_isolated_seed()
+    fire_isolated_population()
