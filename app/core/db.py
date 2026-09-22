@@ -1,15 +1,16 @@
 # backend/app/core/db.py
+import os
 from sqlmodel import SQLModel, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 URL DE CONNEXION DIRECTE INJECTÉE EN DUR - RÉSOUT LE FORMATTAGE DE PORT VIDE
+# 🌐 LIAISON PRODUCTION DIRECTE DURE SANS APPEL AUX VARIABLES INSTABLES DE CONFIG.PY
 DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
+    DATABASE_URL, 
+    echo=False, 
     future=True
 )
 
