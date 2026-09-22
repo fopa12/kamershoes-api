@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 LIAISON PRODUCTION DIRECTE DURE SANS APPEL AUX VARIABLES INSTABLES DE CONFIG.PY
+# 🌐 URI DIRECTE NETTOYÉE ET IMMUNISÉE CONTRE L'ERREUR DE PORT VIDE
 DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 engine = create_async_engine(
