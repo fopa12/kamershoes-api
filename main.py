@@ -2,14 +2,14 @@
 import os
 import sys
 
-# 🛡️ GLOBAL ENGINE OVERRIDE: Forces the connection string into the environment array before ANY module imports
-PRODUCTION_URI = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
-os.environ["DATABASE_URL"] = PRODUCTION_URI
+# 🛡️ INJECTION SYSTÉMIQUE PRIORITAIRE : Écrase la variable globale avant TOUT import de module métier
+ATELIER_URL_CLOUD = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
+os.environ["DATABASE_URL"] = ATELIER_URL_CLOUD
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Secure business endpoint routing imports
+# Les modules de l'application importent maintenant la variable déjà initialisée
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router

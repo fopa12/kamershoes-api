@@ -4,8 +4,12 @@ from sqlmodel import SQLModel, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
-# Inside backend/app/core/config.py (or your settings file)
-DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
+
+# 🌐 URI DIRECTE ET ASYNCHRONE OFFICIELLE DE PRODUCTION POUR SUPABASE CANADA
+ATELIER_URL_CLOUD = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
+
+# 🛡️ INTERCEPTEUR RADICAL : Si le système ou un import tiers tente d'injecter du vide, on le remplace de force
+DATABASE_URL = ATELIER_URL_CLOUD
 
 engine = create_async_engine(
     DATABASE_URL, 
