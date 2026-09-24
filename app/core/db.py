@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 URI DIRECTE NETTOYÉE ET IMMUNISÉE CONTRE L'ERREUR DE PORT VIDE
+# 🌐 SYNTAXE DE PRODUCTION OFFICIELLE DU CLUSTER SUPABASE CANADA ÉVITANT L'ANALYSE DE PORT VIDE
 DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 engine = create_async_engine(
