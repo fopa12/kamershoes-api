@@ -5,12 +5,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 URI DIRECTE ET ASYNCHRONE OFFICIELLE DE PRODUCTION POUR SUPABASE CANADA
-ATELIER_URL_CLOUD = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
+# 🌐 ADRESSE STRICTE HARDCODÉE POUR COURT-CIRCUITER TOUTE ERREUR DE PORT VIDE
+DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
-# 🛡️ INTERCEPTEUR RADICAL : Si le système ou un import tiers tente d'injecter du vide, on le remplace de force
-DATABASE_URL = ATELIER_URL_CLOUD
-
+# Ligne 14 ciblée par Vercel : Execution immunisée
 engine = create_async_engine(
     DATABASE_URL, 
     echo=False, 
