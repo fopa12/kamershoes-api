@@ -2,15 +2,14 @@
 import os
 import sys
 
-# 🛡️ PROTECTION VERCEL ABSOLUE : Surcharge mémoire immédiate avant tout chargement de modules locaux
-DATABASE_CLOUD_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
-
-os.environ["DATABASE_URL"] = DATABASE_CLOUD_URL
+# 🛡️ GLOBAL ENGINE OVERRIDE: Forces the connection string into the environment array before ANY module imports
+PRODUCTION_URI = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
+os.environ["DATABASE_URL"] = PRODUCTION_URI
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Les routes métiers chargent désormais en toute sécurité avec la variable initialisée
+# Secure business endpoint routing imports
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
@@ -23,7 +22,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 BOUCLIER DE SÉCURITÉ CORS POUR LA VITRINE REACT LOCALE
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

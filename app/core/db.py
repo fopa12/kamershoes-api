@@ -4,8 +4,7 @@ from sqlmodel import SQLModel, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
-
-# 🌐 SYNTAXE DE PRODUCTION OFFICIELLE DU CLUSTER SUPABASE CANADA ÉVITANT L'ANALYSE DE PORT VIDE
+# Inside backend/app/core/config.py (or your settings file)
 DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
 
 engine = create_async_engine(
