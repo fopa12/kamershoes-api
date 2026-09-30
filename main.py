@@ -2,12 +2,12 @@
 import os
 import sys
 
-# 🛡️ LE VERROU DE PRODUCTION ABSOLU : Chaîne de connexion poolée asynchrone sur le port 6543
+# 🛡️ PROTECTION INITIALE : Liaison stricte à la passerelle de pooling Supabase Canada sur le port 6543
 URL_VALIDE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
 os.environ["DATABASE_URL"] = URL_VALIDE
 
-# Hack système : si un module tiers essaie d'extraire une variable d'environnement vide, on le court-circuite
+# Hack mémoire : si une dépendance interne cherche à extraire une variable vide, on la bloque au vert
 class SafeEnviron(dict):
     def get(self, key, default=None):
         if key == "DATABASE_URL":
@@ -23,7 +23,7 @@ os.environ = SafeEnviron(os.environ)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importation sécurisée des routeurs après l'initialisation de l'URI mémoire
+# Importation sécurisée des routeurs de l'Atelier
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
@@ -36,7 +36,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 OUVERTURE DU BOUCLIER CORS POUR LA VITRINE REACT LOCALE
+# 🔐 INJECTION DU MIDDLEWARE FastAPI ANTI-CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
