@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 EXPLICIT SECURE INTERCEPTOR ENGINE CONFIGURATION
+# 🌐 LIAISON PRODUCTION DIRECTE INTERCEPTÉE SUR LE PORT DE POOLING 6543
 DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
 engine = create_async_engine(
