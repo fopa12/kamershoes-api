@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 LIAISON PRODUCTION DIRECTE INTERCEPTÉE SUR LE PORT DE POOLING 6543
+# 🌐 LIAISON PRODUCTION DIRECTE INTERCEPTÉE SUR LE PORT DE POOLING 6543 AVEC MOT DE PASSE REÉL VALIDE
 DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
 engine = create_async_engine(

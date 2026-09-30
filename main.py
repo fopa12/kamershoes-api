@@ -2,12 +2,12 @@
 import os
 import sys
 
-# 🛡️ PROTECTION INITIALE : Liaison stricte à la passerelle de pooling Supabase Canada sur le port 6543
+# 🛡️ PROTECTION ULTIME VERCEL : URL de pooling officielle avec mot de passe encodé pour SQLAlchemy
 URL_VALIDE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
 os.environ["DATABASE_URL"] = URL_VALIDE
 
-# Hack mémoire : si une dépendance interne cherche à extraire une variable vide, on la bloque au vert
+# Hack mémoire : empêche n'importe quelle dépendance interne de recharger une variable d'environnement vide
 class SafeEnviron(dict):
     def get(self, key, default=None):
         if key == "DATABASE_URL":
@@ -23,7 +23,7 @@ os.environ = SafeEnviron(os.environ)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importation sécurisée des routeurs de l'Atelier
+# Importation sécurisée des routeurs après l'initialisation de l'URI mémoire
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
@@ -36,7 +36,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 INJECTION DU MIDDLEWARE FastAPI ANTI-CORS
+# 🔐 BOUCLIER CORS SECONDAIRE EN CAS DE BESOIN
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
