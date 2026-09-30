@@ -2,20 +2,26 @@
 import os
 import sys
 
-# 🛡️ PROTECTION ULTIME VERCEL : Injection de la vraie chaîne asynchrone et du vrai mot de passe Supabase
-URL_VALIDE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ8%2F7D6SWtNFzZ@://supabase.com"
+# 🛡️ GLOBAL INFRASTRUCTURE ALIGNMENT
+URL_VALIDE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
+SUPABASE_URL = "https://xpyuefuuxcquqzstityl.supabase.co"
 
 os.environ["DATABASE_URL"] = URL_VALIDE
+os.environ["SUPABASE_URL"] = SUPABASE_URL
 
-# Hack système : si un module tiers ou une configuration essaie d'extraire une variable vide, on la force au vert
+# System Hook: Prevents runtime packages from falling back to empty context variables
 class SafeEnviron(dict):
     def get(self, key, default=None):
         if key == "DATABASE_URL":
             return URL_VALIDE
+        if key == "SUPABASE_URL":
+            return SUPABASE_URL
         return super().get(key, default)
     def __getitem__(self, key):
         if key == "DATABASE_URL":
             return URL_VALIDE
+        if key == "SUPABASE_URL":
+            return SUPABASE_URL
         return super().__getitem__(key)
 
 os.environ = SafeEnviron(os.environ)
@@ -23,7 +29,7 @@ os.environ = SafeEnviron(os.environ)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importation sécurisée des routeurs après l'initialisation de l'URI
+# Relative business pathway routing modules
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
@@ -36,7 +42,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 OUVERTURE DU BOUCLIER CORS POUR LA VITRINE REACT LOCALE
+# 🔐 CROSS-ORIGIN ACCESS HEADERS RE-CONFIGURED
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,4 +59,8 @@ app.include_router(uploads_router)
 
 @app.get("/")
 async def root():
-    return {"status": "operational", "message": "Atelier Kamershoes Cloud Connect active !"}
+    return {
+        "status": "operational", 
+        "message": "Atelier Kamershoes Cloud Connect active !",
+        "endpoint": SUPABASE_URL
+    }
