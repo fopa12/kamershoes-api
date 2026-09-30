@@ -2,20 +2,20 @@
 import os
 import sys
 
-# 🛡️ PROTECTION ULTIME VERCEL : URL de pooling officielle avec mot de passe encodé pour SQLAlchemy
-URL_VALIDE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
+# 🛡️ LE VERROU ABSOLU : Force la variable dans tout le moteur système de Vercel avant tout import
+URL_VALIDE_CLOUD = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
-os.environ["DATABASE_URL"] = URL_VALIDE
+os.environ["DATABASE_URL"] = URL_VALIDE_CLOUD
 
-# Hack mémoire : empêche n'importe quelle dépendance interne de recharger une variable d'environnement vide
+# Hack global : Court-circuite toute tentative de réécriture d'une variable d'environnement vide
 class SafeEnviron(dict):
     def get(self, key, default=None):
         if key == "DATABASE_URL":
-            return URL_VALIDE
+            return URL_VALIDE_CLOUD
         return super().get(key, default)
     def __getitem__(self, key):
         if key == "DATABASE_URL":
-            return URL_VALIDE
+            return URL_VALIDE_CLOUD
         return super().__getitem__(key)
 
 os.environ = SafeEnviron(os.environ)
@@ -23,7 +23,7 @@ os.environ = SafeEnviron(os.environ)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importation sécurisée des routeurs après l'initialisation de l'URI mémoire
+# Les modules s'importent maintenant après le verrouillage de la chaîne de connexion
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
@@ -36,7 +36,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 BOUCLIER CORS SECONDAIRE EN CAS DE BESOIN
+# 🔐 OUVERTURE DU BOUCLIER CORS POUR LA VITRINE REACT LOCALE
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

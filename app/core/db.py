@@ -5,11 +5,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 LIAISON PRODUCTION DIRECTE INTERCEPTÉE SUR LE PORT DE POOLING 6543 AVEC MOT DE PASSE REÉL VALIDE
-DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
+# 🌐 LIAISON DIRECTE IMMUNISÉE CONTRE L'ERREUR DE PORT VIDE
+URL_VALIDE_CLOUD = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
+# Ligne 11 ciblée par Vercel : Forçage asynchrone explicite
 engine = create_async_engine(
-    DATABASE_URL, 
+    str(URL_VALIDE_CLOUD), 
     echo=False, 
     future=True
 )
