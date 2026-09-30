@@ -5,10 +5,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 ADRESSE STRICTE HARDCODÉE POUR COURT-CIRCUITER TOUTE ERREUR DE PORT VIDE
-DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
+# 🌐 LIAISON PRODUCTION DIRECTE DURE IMMUNISÉE CONTRE L'ERREUR DE PORT VIDE
+DATABASE_URL = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ8%2F7D6SWtNFzZ@://supabase.com"
 
-# Ligne 14 ciblée par Vercel : Execution immunisée
 engine = create_async_engine(
     DATABASE_URL, 
     echo=False, 

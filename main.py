@@ -2,12 +2,12 @@
 import os
 import sys
 
-# 🛡️ LE VERROU ABSOLU : Écrase et fige la variable dans tout le moteur Python de Vercel
-URL_VALIDE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:KamershoesCanada2026@://supabase.com"
+# 🛡️ PROTECTION ULTIME VERCEL : Injection de la vraie chaîne asynchrone et du vrai mot de passe Supabase
+URL_VALIDE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ8%2F7D6SWtNFzZ@://supabase.com"
 
 os.environ["DATABASE_URL"] = URL_VALIDE
 
-# Hack système : si un module tiers essaie d'analyser une variable d'environnement vide, on le court-circuite
+# Hack système : si un module tiers ou une configuration essaie d'extraire une variable vide, on la force au vert
 class SafeEnviron(dict):
     def get(self, key, default=None):
         if key == "DATABASE_URL":
@@ -23,7 +23,7 @@ os.environ = SafeEnviron(os.environ)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Les modules de l'Atelier peuvent maintenant charger en toute sécurité, le ValueError est impossible
+# Importation sécurisée des routeurs après l'initialisation de l'URI
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
@@ -36,7 +36,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 OUVERTURE DU CORS POUR LA VITRINE REACT
+# 🔐 OUVERTURE DU BOUCLIER CORS POUR LA VITRINE REACT LOCALE
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
