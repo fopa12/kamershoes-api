@@ -5,15 +5,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# 🌐 L'ADRESSE OFFICIELLE DE POOLING POUR SUPABASE CANADA (PORT 6543)
-URL_BLINDEE_ATELIER = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
+# 🌐 CONSTANTE D'URI ISOLÉE - NE CHERCHE PLUS AUCUN IMPORT EXTÉRIEUR
+URL_VERROUILLEE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
-# 🛡️ LE FILTRE ABSOLU : Si le système transmet une adresse invalide ou vide, on la remplace de force avant la ligne 14
-DATABASE_URL = URL_BLINDEE_ATELIER
-
-# Ligne 14 ciblée par Vercel : Exécution protégée contre tout port vide
+# Ligne 11-15 ciblée par Vercel : Exécution immunisée de force
 engine = create_async_engine(
-    DATABASE_URL, 
+    URL_VERROUILLEE, 
     echo=False, 
     future=True
 )

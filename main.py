@@ -2,28 +2,29 @@
 import os
 import sys
 
-# 🛡️ LE VERROU ABSOLU : Force la variable dans tout le moteur système de Vercel avant tout import
-URL_VALIDE_CLOUD = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
+# 🛡️ LE MAÎTRE VERROU : Définition de l'adresse de pooling officielle Supabase Canada
+URL_PARFAITE = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
 
-os.environ["DATABASE_URL"] = URL_VALIDE_CLOUD
+# On injecte l'URL de force dans l'environnement global de Vercel
+os.environ["DATABASE_URL"] = URL_PARFAITE
 
-# Hack global : Court-circuite toute tentative de réécriture d'une variable d'environnement vide
-class SafeEnviron(dict):
+# Hack système global : si une configuration cachée tente de lire os.getenv, on la force à lire l'URL parfaite
+class ForceEnviron(dict):
     def get(self, key, default=None):
         if key == "DATABASE_URL":
-            return URL_VALIDE_CLOUD
+            return URL_PARFAITE
         return super().get(key, default)
     def __getitem__(self, key):
         if key == "DATABASE_URL":
-            return URL_VALIDE_CLOUD
+            return URL_PARFAITE
         return super().__getitem__(key)
 
-os.environ = SafeEnviron(os.environ)
+os.environ = ForceEnviron(os.environ)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Les modules s'importent maintenant après le verrouillage de la chaîne de connexion
+# Les modules s'importent maintenant de manière sécurisée après le forçage d'environnement
 from app.api.auth import router as auth_router
 from app.api.products import router as products_router
 from app.api.orders import router as orders_router
@@ -36,7 +37,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 🔐 OUVERTURE DU BOUCLIER CORS POUR LA VITRINE REACT LOCALE
+# 🔐 INTERCEPTION DES REQUÊTES DE LA VITRINE REACT
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
