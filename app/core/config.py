@@ -13,6 +13,18 @@ class Settings(BaseSettings):
     # postgresql+asyncpg://USER:MOT_DE_PASSE@HOTE:6543/postgres
     DATABASE_URL: str = ""
 
+    # 📧 Envoi d'e-mails (Gmail : utilisez un NOUVEAU mot de passe d'application)
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    ADMIN_EMAIL: str = ""  # adresse de repli pour les notifications
+
+    # ☁️ Cloudinary (téléversement d'images)
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+
     # Lit aussi un fichier .env local (jamais envoyé sur GitHub) et ignore les variables inconnues
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
