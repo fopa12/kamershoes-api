@@ -1,10 +1,13 @@
 # backend/app/api/products.py
 import traceback
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete
+from sqlalchemy.orm import selectinload  # ⚡ Charge les relations en asynchrone (évite MissingGreenlet)
 from sqlmodel import select, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload  # ⚡ Charge les relations en asynchrone sans bloquer la mémoire
+
 from app.schemas.product import ProductCreate, ProductRead
 from app.models.product import Product, ProductVariant
 from app.models.order import Order, OrderItem
@@ -14,161 +17,237 @@ from app.api.deps import get_current_admin  # Dépendance de sécurité RBAC
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
+# Mot de confirmation exigé pour la purge totale (à passer en paramètre : ?confirm=PURGE-TOUT)
+PURGE_CONFIRMATION = "PURGE-TOUT"
+
+
+def _service_unavailable(err: Exception) -> HTTPException:
+    """
+    Journalise l'erreur côté serveur (logs Vercel) et renvoie une réponse propre.
+    On lève une HTTPException plutôt qu'une erreur brute : elle passe par le middleware CORS,
+    donc le navigateur reçoit un vrai message au lieu d'une fausse erreur CORS.
+    """
+    print(f"💥 Erreur base de données : {err}\n{traceback.format_exc()}")
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Service temporairement indisponible. Réessayez dans un instant.",
+    )
+
+
+# ==========================================================================
+# 🛍️ LECTURE (publique)
+# ==========================================================================
+
 @router.get("/", response_model=List[ProductRead])
 async def list_products(
-    category: Optional[str] = None,  
-    search: Optional[str] = None,    # 🔍 Moteur de recherche dynamique croisée
-    session: AsyncSession = Depends(get_async_session)
+    category: Optional[str] = None,
+    search: Optional[str] = Query(None, max_length=100),  # 🔍 Recherche dynamique croisée
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Récupère tous les produits actifs de la base de données. 
-    Intègre un système anti-crash Vercel pour empêcher le blocage des politiques CORS.
-    """
+    """Récupère les produits actifs avec leurs variantes."""
     try:
-        # ⚡ Chargement non-bloquant des variantes relationnelles (évite le crash MissingGreenlet)
-        statement = select(Product).where(Product.is_active == True).options(selectinload(Product.variants))
-        
-        # 1. Filtrage intelligent par catégorie (si "all", on ignore le filtre pour tout extraire)
-        if category and category != "all" and category != "None":
+        statement = (
+            select(Product)
+            .where(Product.is_active.is_(True))
+            .options(selectinload(Product.variants))
+        )
+
+        # 1. Filtre par catégorie ("all" = pas de filtre)
+        if category and category not in ("all", "None"):
             statement = statement.where(Product.category == category)
-            
-        # 2. 🔍 MOTEUR DE RECHERCHE DYNAMIQUE (ilike ignore les majuscules/minuscules)
+
+        # 2. 🔍 Recherche insensible à la casse (les caractères % et _ saisis sont traités comme du texte)
         if search:
-            search_filter = f"%{search}%"
+            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
             statement = statement.where(
                 or_(
-                    Product.name.ilike(search_filter),
-                    Product.description.ilike(search_filter)
+                    Product.name.ilike(pattern, escape="\\"),
+                    Product.description.ilike(pattern, escape="\\"),
                 )
             )
-            
-        # ⚡ EXECUTION ASYNCHRONE CLOUD SÉCURISÉE : scalars() extrait proprement les entités
+
+        statement = statement.order_by(Product.id).offset(offset).limit(limit)
         results = await session.execute(statement)
         return results.scalars().all()
-        
-    except Exception as e:
-        # 🛡️ PONT DE SECOURS (Fallback) : Évite le crash 500 et maintient le pont CORS ouvert
-        print(f"💥 Erreur d'inventaire capturée: {str(e)}\n{traceback.format_exc()}")
-        return []
+
+    except Exception as err:
+        # ⚠️ On ne renvoie plus une liste vide : cela masquait les pannes de base de données
+        # (la vitrine semblait simplement « vide »). Une 503 est visible et diagnostiquable.
+        raise _service_unavailable(err)
+
 
 @router.get("/{product_id}", response_model=ProductRead)
-async def get_single_product_details(product_id: int, session: AsyncSession = Depends(get_async_session)):
+async def get_single_product_details(
+    product_id: int,
+    session: AsyncSession = Depends(get_async_session),
+):
     try:
-        product = await session.get(Product, product_id)
-        if not product or not product.is_active:
-            raise HTTPException(status_code=404, detail="Cet article de maroquinerie de luxe n'est pas disponible.")
-        return product
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # selectinload : sans lui, la lecture des variantes plante en mode asynchrone (MissingGreenlet)
+        statement = (
+            select(Product)
+            .where(Product.id == product_id, Product.is_active.is_(True))
+            .options(selectinload(Product.variants))
+        )
+        result = await session.execute(statement)
+        product = result.scalars().one_or_none()
+    except Exception as err:
+        raise _service_unavailable(err)
+
+    if not product:
+        raise HTTPException(
+            status_code=404,
+            detail="Cet article de maroquinerie de luxe n'est pas disponible.",
+        )
+    return product
+
+
+# ==========================================================================
+# 🔐 ADMINISTRATION
+# ==========================================================================
 
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 async def create_product(
-    product_in: ProductCreate, 
+    product_in: ProductCreate,
     session: AsyncSession = Depends(get_async_session),
-    admin: User = Depends(get_current_admin)  # 🔐 Sécurisé : bloque les requêtes non-admin
+    admin: User = Depends(get_current_admin),  # 🔐 Bloque les requêtes non-admin
+):
+    """Crée un article et ses variantes en une seule transaction."""
+    if product_in.price_cad <= 0:
+        raise HTTPException(status_code=400, detail="Le prix doit être supérieur à zéro.")
+
+    variants_in = product_in.variants or []
+    for variant in variants_in:
+        if variant.stock < 0:
+            raise HTTPException(status_code=400, detail="Le stock ne peut pas être négatif.")
+
+    try:
+        db_product = Product(
+            name=product_in.name,
+            description=product_in.description,
+            price_cad=product_in.price_cad,
+            image_url=product_in.image_url,
+            category=product_in.category,
+            is_active=product_in.is_active,
+        )
+        session.add(db_product)
+        await session.flush()  # obtient l'id du produit sans valider la transaction
+        new_id = db_product.id
+
+        for variant in variants_in:
+            session.add(
+                ProductVariant(
+                    size=variant.size,
+                    color=variant.color,
+                    stock=variant.stock,
+                    product_id=new_id,
+                )
+            )
+
+        await session.commit()  # produit + variantes validés ensemble (tout ou rien)
+
+        statement = (
+            select(Product)
+            .where(Product.id == new_id)
+            .options(selectinload(Product.variants))
+            .execution_options(populate_existing=True)
+        )
+        result = await session.execute(statement)
+        return result.scalars().one()
+
+    except HTTPException:
+        raise
+    except Exception as err:
+        await session.rollback()
+        raise _service_unavailable(err)
+
+
+# ⚠️ Déclarée avant la suppression unitaire pour éviter toute ambiguïté de routage
+@router.delete("/purge/all-history", status_code=status.HTTP_200_OK)
+async def purge_entire_warehouse_history(
+    confirm: Optional[str] = Query(None, description=f"Doit valoir {PURGE_CONFIRMATION}"),
+    session: AsyncSession = Depends(get_async_session),
+    admin: User = Depends(get_current_admin),
 ):
     """
-    Crée un nouvel article (chaussure, babouche ou sac) de manière asynchrone.
-    Seul l'artisan administrateur authentifié par JWT peut exécuter cette action.
+    💥 REMISE À ZÉRO TOTALE : commandes, lignes de commande, variantes et produits.
+    Irréversible. Exige ?confirm=PURGE-TOUT pour éviter tout appel accidentel.
     """
-    db_product = Product(
-        name=product_in.name,
-        description=product_in.description,
-        price_cad=product_in.price_cad,
-        image_url=product_in.image_url,
-        category=product_in.category,
-        is_active=product_in.is_active
-    )
-    session.add(db_product)
-    await session.commit()
-    await session.refresh(db_product)
-    
-    for variant in product_in.variants:
-        db_variant = ProductVariant(
-            size=variant.size,
-            color=variant.color,
-            stock=variant.stock,
-            product_id=db_product.id
+    if confirm != PURGE_CONFIRMATION:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Confirmation requise : ajoutez le paramètre ?confirm={PURGE_CONFIRMATION}",
         )
-        session.add(db_variant)
-    
-    await session.commit()
-    
-    statement = select(Product).where(Product.id == db_product.id).options(selectinload(Product.variants))
-    refresh_result = await session.execute(statement)
-    return refresh_result.scalars().one()
+
+    print(f"🚨 PURGE TOTALE demandée par l'administrateur id={admin.id}")
+    try:
+        # Suppressions groupées, dans l'ordre des clés étrangères (enfants d'abord)
+        await session.execute(delete(OrderItem))
+        await session.execute(delete(Order))
+        await session.execute(delete(ProductVariant))
+        await session.execute(delete(Product))
+        await session.commit()  # tout ou rien
+    except Exception as err:
+        await session.rollback()
+        raise _service_unavailable(err)
+
+    return {
+        "success": True,
+        "detail": "💥 L'intégralité de la plateforme, des ventes et de l'inventaire a été remise à zéro.",
+    }
+
 
 @router.delete("/{product_id}", status_code=status.HTTP_200_OK)
 async def delete_single_product(
     product_id: int,
     session: AsyncSession = Depends(get_async_session),
-    admin: User = Depends(get_current_admin)  # 🔐 Sécurisé par jeton JWT Administrateur
+    admin: User = Depends(get_current_admin),
 ):
     """
-    🗑️ SUPPRESSION INDIVIDUELLE ABSOLUE : Purge un article, ses déclinaisons 
-    et supprime automatiquement les lignes d'achats clients associées pour casser le verrou SQL.
+    🗑️ Retire un article de la vitrine.
+    - Jamais vendu : suppression définitive (produit + variantes).
+    - Déjà vendu : archivage (is_active = False). L'historique des ventes et les
+      factures des clients restent intacts.
     """
-    variant_statement = select(ProductVariant).where(ProductVariant.product_id == product_id)
-    variant_results = await session.execute(variant_statement)
-    all_variants = variant_results.scalars().all()
-    
-    # B) Liquidation préalable ciblée des reçus d'achats enfants (order_items) pour détruire la contrainte de clé étrangère
-    for var in all_variants:
-        order_item_statement = select(OrderItem).where(OrderItem.variant_id == var.id)
-        order_item_results = await session.execute(order_item_statement)
-        linked_items = order_item_results.scalars().all()
-        
-        for item in linked_items:
-            await session.delete(item)
-            
-        # Maintenant que les jointures financières de l'article sont libérées, on supprime la variante enfant
-        await session.delete(var)
-        
-    await session.flush() # Synchronisation intermédiaire pour libérer l'intégrité référentielle de PostgreSQL
+    try:
+        db_product = await session.get(Product, product_id)
+        if not db_product:
+            raise HTTPException(
+                status_code=404,
+                detail="Cette confection n'existe pas ou a déjà été supprimée.",
+            )
 
-    # C) Destruction définitive du produit parent de la vitrine
-    product_statement = select(Product).where(Product.id == product_id)
-    product_result = await session.execute(product_statement)
-    db_product = product_result.scalars().one_or_none()
-    
-    if not db_product:
-        raise HTTPException(status_code=404, detail="Cette confection n'existe pas ou a déjà été supprimée.")
-        
-    await session.delete(db_product)
-    await session.commit() # Validation SQL définitive de la suppression unifiée
-    return {"success": True, "detail": f"Le modèle #{product_id} et l'historique associé ont été purgés avec succès."}
+        sold = await session.execute(
+            select(OrderItem.id).where(OrderItem.product_id == product_id).limit(1)
+        )
+        has_sales = sold.first() is not None
 
-@router.delete("/purge/all-history", status_code=status.HTTP_200_OK)
-async def purge_entire_warehouse_history(
-    session: AsyncSession = Depends(get_async_session),
-    admin: User = Depends(get_current_admin)  # 🔐 Sécurisé par jeton JWT Administrateur
-):
-    """
-    💥 COMMANDE FLUSH CASCADE : Remet l'intégralité de la base de données PostgreSQL à zéro.
-    Purger séquentiellement dans l'ordre strict des clés étrangères pour empêcher tout plantage.
-    """
-    # Étape 1 : Nettoyer l'historique des lignes enfants de factures (order_items)
-    all_order_items = await session.execute(select(OrderItem))
-    for item in all_order_items.scalars().all():
-        await session.delete(item)
-    await session.flush()
+        if has_sales:
+            db_product.is_active = False
+            session.add(db_product)
+            await session.commit()
+            return {
+                "success": True,
+                "archived": True,
+                "detail": f"Le modèle #{product_id} a déjà été vendu : il est retiré de la vitrine "
+                          f"mais conservé dans l'historique des ventes.",
+            }
 
-    # Étape 2 : Nettoyer l'historique des commandes parentes (orders)
-    all_orders = await session.execute(select(Order))
-    for ord_row in all_orders.scalars().all():
-        await session.delete(ord_row)
-    await session.flush()
+        variants = await session.execute(
+            select(ProductVariant).where(ProductVariant.product_id == product_id)
+        )
+        for variant in variants.scalars().all():
+            await session.delete(variant)
+        await session.flush()  # libère les variantes avant de supprimer le parent
 
-    # Étape 3 : Nettoyer toutes les déclinaisons de variantes de souliers (product_variants)
-    all_variants = await session.execute(select(ProductVariant))
-    for var in all_variants.scalars().all():
-        await session.delete(var)
-    await session.flush()
+        await session.delete(db_product)
+        await session.commit()
+        return {"success": True, "archived": False, "detail": f"Le modèle #{product_id} a été supprimé définitivement."}
 
-    # Étape 4 : Nettoyer l'ensemble des collections de produits (products)
-    all_products = await session.execute(select(Product))
-    for prod in all_products.scalars().all():
-        await session.delete(prod)
-        
-    await session.commit() # Validation unifiée de la purge en cascade absolue
-    return {"success": True, "detail": "💥 L'intégralité de la plateforme, des ventes et de l'inventaire a été remise à zéro."}
+    except HTTPException:
+        raise
+    except Exception as err:
+        await session.rollback()
+        raise _service_unavailable(err)
