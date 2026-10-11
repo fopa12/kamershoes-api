@@ -1,15 +1,20 @@
 # backend/app/core/config.py
-import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    # 🔐 Clé secrète de test Stripe officielle nettoyée
-    STRIPE_SECRET_KEY: str = "sk_test_51U6vZARjpaxWnLPeNAzR4WiJ06nxhCnC2w92I4WW0hzFyh4wOKoRXZtKrZSPrTz75bazxRbhM1nwXu1F5wpZHDiT00Qzsuy7Vh"
-    
-    STRIPE_WEBHOOK_SECRET: str = "whsec_votre_cle_ici"
-    
-    # 🌐 CONFIGURATION FINALE SÉCURISÉE POUR LE CLUSTER SUPABASE CANADA (PORT 6543)
-    # L'adresse de pooling asynchrone est injectée en dur pour couper court à tout crash sur Vercel
-    DATABASE_URL: str = "postgresql+asyncpg://postgres.xpyuefuuxcquqzstityl:wVJ817D6SWtNFzZ@://supabase.com"
+    # 🔐 Tous les secrets sont lus depuis les variables d'environnement
+    # (Vercel : Project > Settings > Environment Variables, ou fichier .env en local).
+    # Les noms ci-dessous doivent correspondre EXACTEMENT aux noms des variables.
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
+    # 🌐 URL Supabase (Transaction pooler, port 6543), au format :
+    # postgresql+asyncpg://USER:MOT_DE_PASSE@HOTE:6543/postgres
+    DATABASE_URL: str = ""
+
+    # Lit aussi un fichier .env local (jamais envoyé sur GitHub) et ignore les variables inconnues
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
 
 settings = Settings()
