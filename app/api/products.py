@@ -9,7 +9,7 @@ from sqlmodel import select, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.schemas.product import ProductCreate, ProductRead
-from app.models.product import Product, ProductVariant
+from app.models.product import Product, ProductVariant, ProductCategory
 from app.models.order import Order, OrderItem
 from app.models.user import User
 from app.core.db import get_async_session  # Sessions asynchrones Cloud
@@ -56,7 +56,11 @@ async def list_products(
 
         # 1. Filtre par catégorie ("all" = pas de filtre)
         if category and category not in ("all", "None"):
-            statement = statement.where(Product.category == category)
+            try:
+                category_filter = ProductCategory(category)
+            except ValueError:
+                return []  # catégorie inconnue : aucun produit (et non une erreur serveur)
+            statement = statement.where(Product.category == category_filter)
 
         # 2. 🔍 Recherche insensible à la casse (les caractères % et _ saisis sont traités comme du texte)
         if search:
