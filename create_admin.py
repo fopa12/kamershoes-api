@@ -1,58 +1,81 @@
 # backend/create_admin.py
+"""
+Crée (ou met à jour) le compte administrateur de l'Atelier.
+
+Usage, depuis le dossier backend, venv activé :
+    python create_admin.py
+
+L'adresse e-mail et le mot de passe sont saisis dans le terminal : rien n'est écrit dans le code.
+Si le compte existe déjà, son mot de passe est remplacé et son rôle est remis à « admin ».
+La base utilisée est celle de DATABASE_URL (fichier .env local).
+"""
 import asyncio
-import sys
-import bcrypt  # 🛡️ Utilisation directe de la bibliothèque officielle native
+import getpass
+
+import bcrypt
 from sqlmodel import select
-from app.core.db import async_session_maker, init_db
+
+from app.core.db import async_session, engine
 from app.models.user import User, UserRole
 
+MIN_PASSWORD_LENGTH = 12
+
+
 def hash_password_native(password: str) -> str:
-    """Hache proprement un mot de passe en utilisant bcrypt natif sans passlib"""
-    password_bytes = password.encode('utf-8')
-    # Génération du grain de sel (salt) et hachage
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode('utf-8')
+    """Hachage bcrypt natif (compatible avec la vérification de connexion)."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-async def create_admin_account():
-    # S'assurer que les tables PostgreSQL existent
-    await init_db()
-    
-    async with async_session_maker() as session:
-        # 1. Vos identifiants administratifs officiels
-        admin_email = "fopsimella@gmail.com"  
-        admin_password = "123456789"  
-        
-        # 2. Vérifier si l'admin existe déjà pour éviter les doublons
-        statement = select(User).where(User.email == admin_email)
-        result = await session.exec(statement)
-        existing_admin = result.first()
-        
-        if existing_admin:
-            print(f"ℹ️ Le compte administrateur ({admin_email}) existe déjà.")
-            return
 
-        print("🔐 Création du compte administrateur avec Bcrypt natif...")
-        
-        # 3. Création de l'entité
-        admin_user = User(
-            email=admin_email,
-            full_name="Artisan Créateur",
-            hashed_password=hash_password_native(admin_password),  # ✨ Utilisation du hachage sécurisé natif
-            role=UserRole.ADMIN,
-            is_active=True
-        )
-        
-        session.add(admin_user)
-        await session.commit()
-        
-        print("🎉 ==========================================")
-        print("🎉 COMPTE ADMINISTRATEUR CRÉÉ AVEC SUCCÈS !")
-        print(f"📧 Email : {admin_email}")
-        print(f"🔑 Rôle  : {admin_user.role}")
-        print("🎉 ==========================================")
+def ask_credentials():
+    """Demande les identifiants dans le terminal (le mot de passe n'est pas affiché)."""
+    email = input("Adresse e-mail de l'administrateur : ").strip().lower()
+    if "@" not in email or " " in email:
+        raise SystemExit("❌ Adresse e-mail invalide.")
+
+    password = getpass.getpass(f"Mot de passe ({MIN_PASSWORD_LENGTH} caractères minimum) : ")
+    confirmation = getpass.getpass("Confirmez le mot de passe : ")
+
+    if password != confirmation:
+        raise SystemExit("❌ Les deux mots de passe ne correspondent pas.")
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise SystemExit(f"❌ Mot de passe trop court ({MIN_PASSWORD_LENGTH} caractères minimum).")
+    if len(password.encode("utf-8")) > 72:
+        raise SystemExit("❌ Mot de passe trop long (72 octets maximum pour bcrypt).")
+
+    full_name = input("Nom complet [Administrateur de l'Atelier] : ").strip()
+    return email, password, full_name or "Administrateur de l'Atelier"
+
+
+async def save_admin(email: str, password: str, full_name: str) -> None:
+    try:
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            user = result.scalars().one_or_none()
+
+            if user:
+                user.hashed_password = hash_password_native(password)
+                user.role = UserRole.ADMIN
+                user.is_active = True
+                action = "mis à jour"
+            else:
+                user = User(
+                    email=email,
+                    full_name=full_name,
+                    hashed_password=hash_password_native(password),
+                    role=UserRole.ADMIN,
+                    is_active=True,
+                )
+                action = "créé"
+
+            session.add(user)
+            await session.commit()
+
+        print(f"✅ Compte administrateur {action}.")
+        print(f"📧 Email : {email}")
+        print("🔑 Rôle  : admin")
+    finally:
+        await engine.dispose()
+
 
 if __name__ == "__main__":
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    asyncio.run(create_admin_account())
+    asyncio.run(save_admin(*ask_credentials()))
