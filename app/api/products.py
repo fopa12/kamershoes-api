@@ -3,6 +3,7 @@ import traceback
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import delete
 from sqlalchemy.orm import selectinload  # ⚡ Charge les relations en asynchrone (évite MissingGreenlet)
 from sqlmodel import select, or_
@@ -19,6 +20,43 @@ router = APIRouter(prefix="/products", tags=["Products"])
 
 # Mot de confirmation exigé pour la purge totale (à passer en paramètre : ?confirm=PURGE-TOUT)
 PURGE_CONFIRMATION = "PURGE-TOUT"
+
+
+# ==========================================================================
+# 📝 SCHÉMAS DE MODIFICATION (tous les champs sont facultatifs : on n'envoie que ce qui change)
+# ==========================================================================
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
+    price_cad: Optional[float] = Field(None, gt=0)
+    image_url: Optional[str] = Field(None, max_length=500)
+    category: Optional[ProductCategory] = None  # "chaussures", "babouches" ou "sacs"
+    is_active: Optional[bool] = None            # false = retiré de la vitrine
+
+
+class VariantCreate(BaseModel):
+    size: Optional[int] = Field(None, ge=0, le=100)   # pointure (vide pour un sac)
+    color: Optional[str] = Field(None, max_length=50)
+    stock: int = Field(0, ge=0, le=100000)
+
+
+class VariantUpdate(BaseModel):
+    size: Optional[int] = Field(None, ge=0, le=100)
+    color: Optional[str] = Field(None, max_length=50)
+    stock: Optional[int] = Field(None, ge=0, le=100000)
+
+
+async def _load_product(session: AsyncSession, product_id: int) -> Optional[Product]:
+    """Relit un produit avec ses variantes à jour (pour renvoyer l'état final à la vitrine)."""
+    statement = (
+        select(Product)
+        .where(Product.id == product_id)
+        .options(selectinload(Product.variants))
+        .execution_options(populate_existing=True)
+    )
+    result = await session.execute(statement)
+    return result.scalars().one_or_none()
 
 
 def _service_unavailable(err: Exception) -> HTTPException:
@@ -160,6 +198,172 @@ async def create_product(
         )
         result = await session.execute(statement)
         return result.scalars().one()
+
+    except HTTPException:
+        raise
+    except Exception as err:
+        await session.rollback()
+        raise _service_unavailable(err)
+
+
+@router.get("/admin/all", response_model=List[ProductRead])
+async def list_all_products_for_admin(
+    session: AsyncSession = Depends(get_async_session),
+    admin: User = Depends(get_current_admin),
+):
+    """Liste TOUS les produits (y compris désactivés ou archivés) pour le tableau de bord."""
+    try:
+        statement = select(Product).options(selectinload(Product.variants)).order_by(Product.id)
+        results = await session.execute(statement)
+        return results.scalars().all()
+    except Exception as err:
+        raise _service_unavailable(err)
+
+
+@router.patch("/{product_id}", response_model=ProductRead)
+async def update_product(
+    product_id: int,
+    changes: ProductUpdate,
+    session: AsyncSession = Depends(get_async_session),
+    admin: User = Depends(get_current_admin),
+):
+    """Modifie un produit : prix, photo, description, catégorie, visibilité. Seuls les champs envoyés changent."""
+    data = changes.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="Aucune modification fournie.")
+
+    for field_name, value in data.items():
+        if value is None:
+            raise HTTPException(status_code=400, detail=f"Le champ « {field_name} » ne peut pas être vide.")
+
+    image_url = data.get("image_url")
+    if image_url and not image_url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="L'adresse de l'image doit commencer par https://")
+
+    try:
+        db_product = await session.get(Product, product_id)
+        if not db_product:
+            raise HTTPException(status_code=404, detail="Cette confection n'existe pas.")
+
+        for field_name, value in data.items():
+            setattr(db_product, field_name, value)
+        session.add(db_product)
+        await session.commit()
+
+        return await _load_product(session, product_id)
+
+    except HTTPException:
+        raise
+    except Exception as err:
+        await session.rollback()
+        raise _service_unavailable(err)
+
+
+@router.post("/{product_id}/variants", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+async def add_variant(
+    product_id: int,
+    variant_in: VariantCreate,
+    session: AsyncSession = Depends(get_async_session),
+    admin: User = Depends(get_current_admin),
+):
+    """Ajoute une déclinaison (pointure, couleur, stock) à un produit existant."""
+    try:
+        db_product = await session.get(Product, product_id)
+        if not db_product:
+            raise HTTPException(status_code=404, detail="Cette confection n'existe pas.")
+
+        duplicate = await session.execute(
+            select(ProductVariant.id)
+            .where(
+                ProductVariant.product_id == product_id,
+                ProductVariant.size == variant_in.size,
+                ProductVariant.color == variant_in.color,
+            )
+            .limit(1)
+        )
+        if duplicate.first() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Cette déclinaison existe déjà : modifiez son stock au lieu d'en créer une seconde.",
+            )
+
+        session.add(
+            ProductVariant(
+                product_id=product_id,
+                size=variant_in.size,
+                color=variant_in.color,
+                stock=variant_in.stock,
+            )
+        )
+        await session.commit()
+
+        return await _load_product(session, product_id)
+
+    except HTTPException:
+        raise
+    except Exception as err:
+        await session.rollback()
+        raise _service_unavailable(err)
+
+
+@router.patch("/variants/{variant_id}", response_model=ProductRead)
+async def update_variant(
+    variant_id: int,
+    changes: VariantUpdate,
+    session: AsyncSession = Depends(get_async_session),
+    admin: User = Depends(get_current_admin),
+):
+    """Modifie une déclinaison (surtout le stock). Renvoie le produit complet à jour."""
+    data = changes.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="Aucune modification fournie.")
+    if "stock" in data and data["stock"] is None:
+        raise HTTPException(status_code=400, detail="Le stock ne peut pas être vide.")
+
+    try:
+        variant = await session.get(ProductVariant, variant_id)
+        if not variant:
+            raise HTTPException(status_code=404, detail="Cette déclinaison n'existe pas.")
+
+        parent_id = variant.product_id
+        for field_name, value in data.items():
+            setattr(variant, field_name, value)
+        session.add(variant)
+        await session.commit()
+
+        return await _load_product(session, parent_id)
+
+    except HTTPException:
+        raise
+    except Exception as err:
+        await session.rollback()
+        raise _service_unavailable(err)
+
+
+@router.delete("/variants/{variant_id}", status_code=status.HTTP_200_OK)
+async def delete_variant(
+    variant_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    admin: User = Depends(get_current_admin),
+):
+    """Supprime une déclinaison jamais vendue. Une déclinaison déjà vendue doit passer à stock 0."""
+    try:
+        variant = await session.get(ProductVariant, variant_id)
+        if not variant:
+            raise HTTPException(status_code=404, detail="Cette déclinaison n'existe pas.")
+
+        sold = await session.execute(
+            select(OrderItem.id).where(OrderItem.variant_id == variant_id).limit(1)
+        )
+        if sold.first() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Cette déclinaison a déjà été vendue : mettez son stock à 0 plutôt que de la supprimer.",
+            )
+
+        await session.delete(variant)
+        await session.commit()
+        return {"success": True, "detail": f"La déclinaison #{variant_id} a été supprimée."}
 
     except HTTPException:
         raise
