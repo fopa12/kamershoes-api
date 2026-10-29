@@ -21,7 +21,7 @@ from app.models.product import Product, ProductVariant
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.user import User
 from app.core.db import get_async_session
-from app.api.deps import get_current_user, get_current_admin  # 🔐 Dépendances RBAC
+from app.api.deps import get_optional_user, get_current_admin  # 🔐 Dépendances RBAC
 
 # 🔐 Clé Stripe lue depuis les variables d'environnement (jamais écrite dans le code)
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -153,7 +153,7 @@ def send_shipping_email(order: Order, recipient_email: str) -> None:
 async def create_and_confirm_payment_intent(
     payload: Request,
     session: AsyncSession = Depends(get_async_session),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_user),  # facultatif : les clients sans compte peuvent commander
 ):
     # 🛑 Cette caisse confirme le paiement avec une carte de TEST (tok_visa).
     # Elle ne doit donc jamais tourner avec une clé réelle (sk_live_...).
