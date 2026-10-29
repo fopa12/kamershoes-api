@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     # postgresql+asyncpg://USER:MOT_DE_PASSE@HOTE:6543/postgres
     DATABASE_URL: str = ""
 
+    # 🔑 Clé de signature des jetons de connexion (JWT) : DÉDIÉE, jamais la clé Stripe.
+    # À générer avec : python -c "import secrets; print(secrets.token_hex(32))"
+    SECRET_KEY: str = ""
+
     # 📧 Envoi d'e-mails (Gmail : utilisez un NOUVEAU mot de passe d'application)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
